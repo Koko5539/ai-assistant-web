@@ -47,6 +47,7 @@ export default function ChatPage() {
   const [toast, setToast] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<Message[]>([]);
 
   // 获取当前模式的图标组件
   const CurrentRoleIcon = useMemo(() => {
@@ -80,6 +81,7 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
+    messagesRef.current = [welcomeMessage];
   }, [router]);
 
   // 自动滚动到底部
@@ -97,13 +99,17 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => {
+      messagesRef.current = [...prev, userMessage];
+      return messagesRef.current;
+    });
     setInput('');
     setIsLoading(true);
     inputRef.current?.blur();
 
     setTimeout(() => {
-      const aiResponse = generateAIResponse(userMessage.content, currentRole, isVIP);
+      const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }));
+      const aiResponse = generateAIResponse(userMessage.content, currentRole, isVIP, history);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -112,13 +118,17 @@ export default function ChatPage() {
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => {
+        messagesRef.current = [...prev, aiMessage];
+        return messagesRef.current;
+      });
       setIsLoading(false);
     }, 800 + Math.random() * 1200);
   };
 
   const handleClear = () => {
     setMessages([]);
+    messagesRef.current = [];
     const welcomeMessage: Message = {
       id: Date.now().toString(),
       role: 'assistant',
@@ -128,6 +138,7 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
+    messagesRef.current = [welcomeMessage];
   };
 
   const handleLogout = () => {
