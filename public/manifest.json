@@ -1,7 +1,7 @@
 {
-  "name": "AI助手 - 智能对话",
+  "name": "AI智能助手 - 全能AI伴侣",
   "short_name": "AI助手",
-  "description": "智能AI助手，支持写作、编程、知识问答",
+  "description": "智能AI助手，支持7种对话模式、代码生成、游戏开发、汇编语言",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -19,14 +19,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
-    }
-  ],
-  "categories": ["productivity", "utilities"],
-  "screenshots": [
-    {
-      "src": "/screenshot-1.png",
-      "sizes": "1280x720",
-      "type": "image/png"
     }
   ]
 }

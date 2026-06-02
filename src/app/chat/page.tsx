@@ -7,7 +7,7 @@ import { checkAuth, localLogout } from '@/lib/localAuth';
 import { roleConfigs, generateAIResponse } from '@/lib/aiResponses';
 import type { RoleMode } from '@/lib/aiResponses';
 
-type BottomTab = 'chat' | 'profile';
+type BottomTab = 'chat' | 'features' | 'profile' | 'settings';
 
 interface Message {
   id: string;
@@ -21,6 +21,18 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Heart, Flame, Cloud, Shield, Code, Gamepad2, Cpu
 };
 
+// 功能模块定义
+const featureModules = [
+  { id: 'coder', emoji: '💻', name: '智能代码助手', desc: '代码生成、Review、调试', mode: 'coder' as RoleMode, vipOnly: false, devMsg: '' },
+  { id: 'gamer', emoji: '🎮', name: 'AI创作平台', desc: '游戏内容、故事、角色', mode: 'gamer' as RoleMode, vipOnly: false, devMsg: '' },
+  { id: 'voice', emoji: '🎙️', name: '语音识别', desc: '多语言语音交互', mode: null, vipOnly: true, devMsg: '语音功能开发中' },
+  { id: 'knowledge', emoji: '📚', name: '知识库', desc: '文档上传、AI记忆', mode: null, vipOnly: true, devMsg: '知识库功能开发中' },
+  { id: 'image', emoji: '🖼️', name: 'AI绘图', desc: '文字生成图片', mode: null, vipOnly: true, devMsg: '绘图功能开发中' },
+  { id: 'writing', emoji: '✍️', name: '智能写作', desc: '文章生成、润色', mode: null, vipOnly: true, devMsg: '写作功能开发中' },
+  { id: 'assembly', emoji: '⚙️', name: '汇编模式', desc: '汇编语言、底层开发', mode: 'assembly' as RoleMode, vipOnly: false, devMsg: '' },
+  { id: 'package', emoji: '🔧', name: 'AI打包', desc: '云端构建APK', mode: null, vipOnly: true, devMsg: '打包功能开发中' },
+];
+
 export default function ChatPage() {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,6 +44,7 @@ export default function ChatPage() {
   const [userAccount, setUserAccount] = useState('');
   const [currentRole, setCurrentRole] = useState<RoleMode>('lover');
   const [activeTab, setActiveTab] = useState<BottomTab>('chat');
+  const [toast, setToast] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -40,6 +53,12 @@ export default function ChatPage() {
     return iconMap[roleConfigs[currentRole].icon] || Bot;
   }, [currentRole]);
 
+  // 显示提示消息
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2000);
+  };
+
   // 检查登录状态
   useEffect(() => {
     const user = checkAuth();
@@ -47,16 +66,16 @@ export default function ChatPage() {
       router.push('/login');
       return;
     }
-    
+
     setUserName(user.nickname || user.account);
     setUserAccount(user.account);
     setIsVIP(user.isVIP);
-    
+
     const welcomeMessage: Message = {
       id: Date.now().toString(),
       role: 'assistant',
-      content: user.isVIP 
-        ? `欢迎回来，${user.nickname}~ 我是你的全能AI助手！🎉\n\n当前模式：${roleConfigs[currentRole].name}\n${roleConfigs[currentRole].description}\n\n共7种模式可切换：\n💕 恋人 / 🔥 毒舌 / ☁️ 温柔 / 👑 霸道\n💻 编程助手 / 🎮 游戏开发 / ⚙️ 汇编模式\n\n点击左上角菜单切换模式~`
+      content: user.isVIP
+        ? `欢迎回来，${user.nickname || user.account}~ 我是你的全能AI助手！🎉\n\n当前模式：${roleConfigs['lover'].name}\n${roleConfigs['lover'].description}\n\n💡 提示：\n- 点击左上角菜单切换7种AI模式\n- 点击底部「功能」查看所有功能模块\n- 点击底部「我的」查看VIP状态\n\n共7种模式：💕恋人 🔥毒舌 ☁️温柔 👑霸道 💻编程 🎮游戏 ⚙️汇编`
         : `你好呀！我是你的AI助手。\n\n普通用户只能查看界面，AI对话功能需要升级VIP才能使用哦~`,
       timestamp: new Date(),
     };
@@ -85,7 +104,7 @@ export default function ChatPage() {
 
     setTimeout(() => {
       const aiResponse = generateAIResponse(userMessage.content, currentRole, isVIP);
-      
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -119,7 +138,7 @@ export default function ChatPage() {
   const switchRole = (role: RoleMode) => {
     setCurrentRole(role);
     setSidebarOpen(false);
-    
+
     const roleMessage: Message = {
       id: Date.now().toString(),
       role: 'assistant',
@@ -127,6 +146,20 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, roleMessage]);
+  };
+
+  // 处理功能模块点击
+  const handleFeatureClick = (feature: typeof featureModules[0]) => {
+    if (feature.vipOnly && !isVIP) {
+      showToast('此功能仅限VIP会员使用');
+      return;
+    }
+    if (feature.mode) {
+      switchRole(feature.mode);
+      setActiveTab('chat');
+    } else if (feature.devMsg) {
+      showToast(feature.devMsg);
+    }
   };
 
   // 发送按钮颜色
@@ -191,7 +224,7 @@ export default function ChatPage() {
             </div>
           </div>
         ))}
-        
+
         {isLoading && (
           <div className="flex gap-2 sm:gap-4">
             <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${roleConfigs[currentRole].bgColor}`}>
@@ -240,6 +273,33 @@ export default function ChatPage() {
         )}
       </div>
     </>
+  );
+
+  // 功能页面
+  const FeaturesView = () => (
+    <div className="flex-1 overflow-y-auto">
+      <div className="flex items-center justify-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800/50">
+        <h1 className="text-base sm:text-lg font-semibold text-white">功能</h1>
+      </div>
+      <div className="p-4">
+        <div className="grid grid-cols-2 gap-3">
+          {featureModules.map((feature) => (
+            <button
+              key={feature.id}
+              onClick={() => handleFeatureClick(feature)}
+              className="bg-slate-800 border border-slate-600 rounded-2xl p-4 text-left hover:bg-slate-700 transition-colors"
+            >
+              <div className="text-3xl mb-2">{feature.emoji}</div>
+              <h3 className="text-sm font-semibold text-white mb-1">{feature.name}</h3>
+              <p className="text-xs text-gray-400">{feature.desc}</p>
+              {feature.vipOnly && (
+                <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-full">VIP</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 
   // 个人中心界面
@@ -334,7 +394,7 @@ export default function ChatPage() {
               <p className="text-gray-400 text-sm">清除所有聊天记录</p>
             </div>
           </button>
-          <button onClick={() => router.push('/settings')} className="w-full flex items-center gap-4 px-4 py-4 hover:bg-slate-700 transition-colors">
+          <button onClick={() => setActiveTab('settings')} className="w-full flex items-center gap-4 px-4 py-4 hover:bg-slate-700 transition-colors">
             <div className="w-10 h-10 rounded-full bg-gray-500/20 flex items-center justify-center">
               <Settings className="w-5 h-5 text-gray-400" />
             </div>
@@ -352,6 +412,99 @@ export default function ChatPage() {
       </div>
     </div>
   );
+
+  // 设置页面
+  const SettingsView = () => (
+    <div className="flex-1 overflow-y-auto">
+      <div className="flex items-center justify-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800/50">
+        <h1 className="text-base sm:text-lg font-semibold text-white">设置</h1>
+      </div>
+      <div className="p-4 space-y-4">
+        {/* 主题切换 */}
+        <div className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden">
+          <div className="flex items-center gap-4 px-4 py-4">
+            <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-white font-medium">主题模式</p>
+              <p className="text-gray-400 text-sm">深色模式</p>
+            </div>
+            <span className="text-green-400 text-sm font-medium">深色模式 ✓</span>
+          </div>
+        </div>
+
+        {/* 清除缓存 */}
+        <div className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden">
+          <button
+            onClick={() => {
+              handleClear();
+              showToast('缓存已清除');
+            }}
+            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-slate-700 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-red-400" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-white font-medium">清除缓存</p>
+              <p className="text-gray-400 text-sm">清除聊天记录和缓存数据</p>
+            </div>
+          </button>
+        </div>
+
+        {/* 关于我们 */}
+        <div className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden">
+          <div className="flex items-center gap-4 px-4 py-4">
+            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <Bot className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-white font-medium">关于我们</p>
+              <p className="text-gray-400 text-sm">AI智能助手 v2.0.0</p>
+            </div>
+            <span className="text-gray-500 text-xs">v2.0.0</span>
+          </div>
+        </div>
+
+        {/* VIP信息 */}
+        <div className={`rounded-2xl border overflow-hidden ${isVIP ? 'bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-yellow-500/30' : 'bg-slate-800 border-slate-600'}`}>
+          <div className="flex items-center gap-4 px-4 py-4">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isVIP ? 'bg-yellow-500/20' : 'bg-gray-500/20'}`}>
+              <Crown className={`w-5 h-5 ${isVIP ? 'text-yellow-400' : 'text-gray-400'}`} />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-white font-medium">VIP信息</p>
+              <p className="text-gray-400 text-sm">{isVIP ? 'VIP会员 · 已激活' : '普通用户 · 未开通'}</p>
+            </div>
+            {isVIP ? (
+              <span className="text-yellow-400 text-sm font-medium">已开通</span>
+            ) : (
+              <button onClick={() => router.push('/settings')} className="px-3 py-1 bg-gradient-to-r from-yellow-600 to-orange-600 text-white text-sm rounded-lg">
+                升级
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 退出登录 */}
+        <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-red-500/10 text-red-400 rounded-2xl border border-red-500/30 hover:bg-red-500/20 transition-colors">
+          <LogOut className="w-5 h-5" />
+          <span>退出登录</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  // 渲染当前Tab内容
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'chat': return <ChatView />;
+      case 'features': return <FeaturesView />;
+      case 'profile': return <ProfileView />;
+      case 'settings': return <SettingsView />;
+    }
+  };
 
   return (
     <div className="flex h-screen bg-slate-900 overflow-hidden">
@@ -436,22 +589,44 @@ export default function ChatPage() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        {activeTab === 'chat' ? <ChatView /> : <ProfileView />}
+        {renderContent()}
 
+        {/* Toast 提示 */}
+        {toast && (
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 px-6 py-3 bg-slate-700 text-white text-sm rounded-xl shadow-lg border border-slate-600">
+            {toast}
+          </div>
+        )}
+
+        {/* 底部Tab栏 */}
         <div className="flex items-center justify-around p-2 border-t border-slate-700 bg-slate-800/90 backdrop-blur-sm safe-area-pb">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${activeTab === 'chat' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'chat' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             <MessageCircle className="w-6 h-6" />
             <span className="text-xs">对话</span>
           </button>
           <button
+            onClick={() => setActiveTab('features')}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'features' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            <Sparkles className="w-6 h-6" />
+            <span className="text-xs">功能</span>
+          </button>
+          <button
             onClick={() => setActiveTab('profile')}
-            className={`flex flex-col items-center gap-1 px-6 py-2 rounded-xl transition-colors ${activeTab === 'profile' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'profile' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             <UserCircle className="w-6 h-6" />
             <span className="text-xs">我的</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'settings' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            <Settings className="w-6 h-6" />
+            <span className="text-xs">设置</span>
           </button>
         </div>
       </div>
