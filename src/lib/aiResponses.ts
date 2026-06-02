@@ -1028,11 +1028,68 @@ const followUpQuestions = [
   '你呢？',
   '你觉得呢？',
   '还有什么想说的吗？',
-  '然后呢？',
   '跟我说说呗~',
   '你怎么看？',
   '真的吗？详细说说~',
 ];
+
+// ========== 情绪检测系统 ==========
+
+type UserEmotion = 'happy' | 'sad' | 'angry' | 'laughing' | 'shy' | 'neutral';
+
+const emotionKeywords: Record<UserEmotion, string[]> = {
+  happy: ['开心', '高兴', '太好了', '好棒', '哈哈', '嘻嘻', '幸福', '兴奋', '棒', '厉害', '不错', '赞'],
+  sad: ['难过', '伤心', '哭', '心痛', '失落', '沮丧', '绝望', '痛苦', '悲伤', '郁闷', '不开心'],
+  angry: ['生气', '烦', '气死', '火大', '讨厌', '恨', '怒', '烦躁', '暴躁', '受不了'],
+  laughing: ['哈哈', '哈哈哈哈', '哈哈哈', '笑死', '笑死我了', '好笑', '搞笑', '逗我', '乐死', '233', '666'],
+  shy: ['害羞', '不好意思', '羞羞', '脸红', '尴尬', '咳咳', '那个'],
+  neutral: []
+};
+
+function detectEmotion(message: string): UserEmotion {
+  for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+    if (emotion === 'neutral') continue;
+    for (const keyword of keywords) {
+      if (message.includes(keyword)) return emotion as UserEmotion;
+    }
+  }
+  return 'neutral';
+}
+
+// 情绪回复 - 当检测到用户有强烈情绪时优先使用
+const emotionResponses: Record<UserEmotion, Partial<Record<RoleMode, string[]>>> = {
+  happy: {
+    lover: ['看你开心我就开心！什么事这么高兴呀~', '太好了！看到你高兴我也就放心了~', '你笑起来一定很好看~ 继续开心！', '开心就好！有什么好事分享给我呀~'],
+    toxic: ['笑那么开心干嘛？有什么好事也不告诉我。', '看你笑得跟傻子似的。', '行吧，看你高兴就算了。', '笑什么笑，有什么好笑的。'],
+    gentle: ['看到你开心真好！是什么让你这么高兴呢？', '你的快乐也感染了我~ 愿意分享一下吗？', '真好，保持这份好心情呀~', '开心的时候记得把快乐分享给身边的人哦。'],
+    dominant: ['开心就好。但不许笑得太大声。', '高兴？那是应该的，因为我让你高兴。', '笑吧，但记住你是我的。', '看你笑我就满意了。']
+  },
+  sad: {
+    lover: ['宝贝怎么了？发生什么事了？跟我说说~', '别难过啦~ 有我在呢，我陪你。', '心疼你... 谁欺负你了？告诉我！', '别哭了好不好... 我最怕看到你难过了。'],
+    toxic: ['又难过？你怎么这么脆弱。', '哭什么哭，有什么好哭的。', '行了行了，别矫情了。', '难过就难过呗，谁没难过的。'],
+    gentle: ['别难过，一切都会好起来的。', '我理解你的感受，愿意跟我说说吗？', '难过的时候就让我陪着你吧。', '没关系，允许自己难过，但别忘了还有人在乎你。'],
+    dominant: ['谁让你难过的？告诉我，我去处理。', '不许难过。你是我的，只能开心。', '过来，让我抱抱你。', '难过？有我在，谁也不能欺负你。']
+  },
+  angry: {
+    lover: ['宝贝别生气了~ 是我惹你不高兴了吗？', '谁惹你生气了？告诉我，我去帮你出气！', '别气别气~ 气坏了身体不好，我心疼~', '消消气嘛~ 我给你讲个笑话好不好？'],
+    toxic: ['生气？你也配？', '气什么气，有本事来怼我啊。', '你生气的样子还挺可爱的。', '行了别气了，看着累。'],
+    gentle: ['深呼吸，慢慢来，不要让情绪控制你。', '生气是可以的，但也要照顾好自己的身体。', '我能感受到你的不满，愿意说说吗？', '别太生气了，对身体不好。'],
+    dominant: ['生气？在我面前可以，但别对别人。', '消气。这是命令。', '谁让你生气的？我帮你解决。', '过来，冷静一下。']
+  },
+  laughing: {
+    lover: ['哈哈哈你笑什么呀~ 说来听听！', '看你笑我也想笑了！什么事这么好笑？', '你笑起来真好看~ 多笑笑！', '笑什么笑~ 是不是我太可爱了？'],
+    toxic: ['笑什么笑，有那么好笑吗？', '你笑得跟二傻子似的。', '笑死了？那你笑啊，继续笑。', '有什么好笑的，说来听听。'],
+    gentle: ['看你笑得这么开心，我也跟着高兴了~', '笑一笑十年少，继续保持！', '你的笑声很有感染力呢~', '有什么有趣的事吗？分享给我听听~'],
+    dominant: ['笑吧。但只能对我笑。', '你笑起来... 还行。', '笑什么？说。', '看在你笑的份上，不罚你了。']
+  },
+  shy: {
+    lover: ['害羞啦~ 好可爱！', '脸红了吗？让我看看~', '宝贝害羞的样子好萌！', '别害羞嘛~ 在我面前不用害羞~'],
+    toxic: ['害羞什么，有什么好害羞的。', '脸红了？真没出息。', '你也会害羞？我以为你脸皮很厚呢。', '行了，别装了。'],
+    gentle: ['害羞没关系，慢慢来~', '不用不好意思，我很随和的。', '害羞的样子很可爱呢~', '别紧张，放松就好~'],
+    dominant: ['害羞？在我面前不用。', '不许害羞。看着我的眼睛。', '脸红了？有意思。', '害羞也没用，你是我的。']
+  },
+  neutral: {}
+};
 
 // ========== 核心 generateAIResponse 函数 ==========
 
@@ -1062,43 +1119,65 @@ function generateAIResponse(
     }
   }
 
+  // ========== 情绪检测（高优先级）==========
+  const emotion = detectEmotion(userMessage);
+  if (emotion !== 'neutral') {
+    const emotionResp = emotionResponses[emotion]?.[mode];
+    if (emotionResp && emotionResp.length > 0) {
+      // 去重
+      const lastAiMessage = history.filter(m => m.role === 'assistant').pop();
+      const lastContent = lastAiMessage?.content?.replace(/[💕💗😘🥰❤️💖💝💘😏🙄😤💢🗯️😒🤨🌸✨💫🌙☁️🤗💙🌿🔥⚡💪👑⛓️🖤🔒⚔️💚🟢💻🎮⚙️]+$/g, '').trim();
+      let idx = Math.floor(Math.random() * emotionResp.length);
+      let response = emotionResp[idx];
+      const cleanResponse = response.replace(/[💕💗😘🥰❤️💖💝💘😏🙄😤💢🗯️😒🤨🌸✨💫🌙☁️🤗💙🌿🔥⚡💪👑⛓️🖤🔒⚔️💚🟢💻🎮⚙️]+$/g, '').trim();
+      if (cleanResponse === lastContent && emotionResp.length > 1) {
+        idx = (idx + 1) % emotionResp.length;
+        response = emotionResp[idx];
+      }
+      const emojis = modeEmojis[mode];
+      return response + ' ' + emojis[Math.floor(Math.random() * emojis.length)];
+    }
+  }
+
   // ========== 模式分流 ==========
   // coder/gamer/assembly 模式使用现有的 aiResponses 和 intentResponses
   if (mode === 'coder' || mode === 'gamer' || mode === 'assembly') {
     const intent = detectIntent(userMessage);
     const responses = intentResponses[intent]?.[mode] || aiResponses[mode];
 
-    // 去重：获取AI上一条回复
     const lastAiMessage = history.filter(m => m.role === 'assistant').pop();
+    const lastContent = lastAiMessage?.content?.replace(/[💕💗😘🥰❤️💖💝💘😏🙄😤💢🗯️😒🤨🌸✨💫🌙☁️🤗💙🌿🔥⚡💪👑⛓️🖤🔒⚔️💚🟢💻🎮⚙️]+$/g, '').trim();
     let randomIndex = Math.floor(Math.random() * responses.length);
     let response = responses[randomIndex];
-    if (response === lastAiMessage?.content) {
+    const cleanResponse = response.replace(/[💕💗😘🥰❤️💖💝💘😏🙄😤💢🗯️😒🤨🌸✨💫🌙☁️🤗💙🌿🔥⚡💪👑⛓️🖤🔒⚔️💚🟢💻🎮⚙️]+$/g, '').trim();
+    if (cleanResponse === lastContent && responses.length > 1) {
       randomIndex = (randomIndex + 1) % responses.length;
       response = responses[randomIndex];
     }
 
     const emojis = modeEmojis[mode];
-    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-    return response + ' ' + randomEmoji;
+    return response + ' ' + emojis[Math.floor(Math.random() * emojis.length)];
   }
 
   // ========== lover/toxic/gentle/dominant 使用话题系统 ==========
   const topic = detectTopic(userMessage);
   const responses = topicResponses[topic]?.[mode] || topicResponses['unknown'][mode];
 
-  // 去重：获取AI上一条回复
+  // 去重：比较时去除emoji
   const lastAiMessage = history.filter(m => m.role === 'assistant').pop();
+  const lastContent = lastAiMessage?.content?.replace(/[💕💗😘🥰❤️💖💝💘😏🙄😤💢🗯️😒🤨🌸✨💫🌙☁️🤗💙🌿🔥⚡💪👑⛓️🖤🔒⚔️💚🟢💻🎮⚙️]+$/g, '').trim();
   let randomIndex = Math.floor(Math.random() * responses.length);
   let response = responses[randomIndex];
-  if (response === lastAiMessage?.content) {
+  const cleanResponse = response.replace(/[💕💗😘🥰❤️💖💝💘😏🙄😤💢🗯️😒🤨🌸✨💫🌙☁️🤗💙🌿🔥⚡💪👑⛓️🖤🔒⚔️💚🟢💻🎮⚙️]+$/g, '').trim();
+  if (cleanResponse === lastContent && responses.length > 1) {
     randomIndex = (randomIndex + 1) % responses.length;
     response = responses[randomIndex];
   }
 
-  // 50%概率添加追问
-  if (Math.random() < 0.5) {
+  // 30%概率添加追问（降低频率，避免每条都追问）
+  if (Math.random() < 0.3) {
     const followUp = followUpQuestions[Math.floor(Math.random() * followUpQuestions.length)];
-    response += followUp;
+    response = response + '\n\n' + followUp;
   }
 
   // 添加随机emoji
