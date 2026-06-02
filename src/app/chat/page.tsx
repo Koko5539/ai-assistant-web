@@ -6,6 +6,7 @@ import { Send, User, Bot, Crown, Menu, X, Trash2, LogOut, Heart, Flame, Cloud, S
 import { checkAuth, localLogout } from '@/lib/localAuth';
 import { roleConfigs, generateAIResponse } from '@/lib/aiResponses';
 import type { RoleMode } from '@/lib/aiResponses';
+import RainBackground from '@/components/RainBackground';
 
 type BottomTab = 'chat' | 'features' | 'profile' | 'settings';
 
@@ -518,9 +519,14 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-900 overflow-hidden">
+    <div className="relative flex h-screen overflow-hidden">
+      {/* 动态雨景雷电背景 */}
+      <RainBackground />
+
+      {/* 主内容层 */}
+      <div className="relative z-10 flex w-full h-full">
       {/* 侧边栏 */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-[280px] sm:w-64 bg-slate-800 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-2xl lg:shadow-none overflow-y-auto`}>
+      <div className={`fixed inset-y-0 left-0 z-50 w-[280px] sm:w-64 bg-slate-800/80 backdrop-blur-xl transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 shadow-2xl lg:shadow-none overflow-y-auto`}>
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-slate-700 flex items-center justify-between">
             <h2 className="text-lg sm:text-xl font-bold text-white">AI助手</h2>
@@ -610,7 +616,7 @@ export default function ChatPage() {
         )}
 
         {/* 底部Tab栏 */}
-        <div className="flex items-center justify-around p-2 border-t border-slate-700 bg-slate-800/90 backdrop-blur-sm safe-area-pb">
+        <div className="flex items-center justify-around p-2 border-t border-slate-700 bg-slate-800/80 backdrop-blur-xl safe-area-pb">
           <button
             onClick={() => setActiveTab('chat')}
             className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'chat' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-300'}`}
@@ -640,6 +646,7 @@ export default function ChatPage() {
             <span className="text-xs">设置</span>
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
