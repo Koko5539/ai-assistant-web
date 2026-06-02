@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, User, Bot, Crown, Menu, X, Trash2, LogOut, Heart, Flame, Cloud, Shield, UserCircle, Settings, Sparkles, MessageCircle, Code, Gamepad2, Cpu } from 'lucide-react';
+import { Send, User, Bot, Crown, Menu, X, Trash2, LogOut, Heart, Flame, Cloud, Shield, UserCircle, Settings, Sparkles, MessageCircle, Code, Gamepad2, Cpu, Key, ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
 import { checkAuth, localLogout } from '@/lib/localAuth';
 import { roleConfigs, generateAIResponse } from '@/lib/aiResponses';
 import type { RoleMode } from '@/lib/aiResponses';
-import { callAI, getAPIConfig } from '@/lib/aiApi';
+import { callAI, getAPIConfig, saveAPIConfig, getAllProviders, getProviderConfig } from '@/lib/aiApi';
+import type { AIProvider } from '@/lib/aiApi';
 import RainBackground from '@/components/RainBackground';
 
 type BottomTab = 'chat' | 'features' | 'profile' | 'settings';
@@ -51,6 +52,16 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]);
 
+  // API配置状态
+  const [apiProvider, setApiProvider] = useState<AIProvider>('moonshot');
+  const [apiKey, setApiKey] = useState('');
+  const [apiModel, setApiModel] = useState('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [showApiKeyVisible, setShowApiKeyVisible] = useState(false);
+  const [apiTestStatus, setApiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [apiTestMsg, setApiTestMsg] = useState('');
+  const [showProviderDropdown, setShowProviderDropdown] = useState(false);
+
   // 获取当前模式的图标组件
   const CurrentRoleIcon = useMemo(() => {
     return iconMap[roleConfigs[currentRole].icon] || Bot;
@@ -73,6 +84,12 @@ export default function ChatPage() {
     setUserName(user.nickname || user.account);
     setUserAccount(user.account);
     setIsVIP(user.isVIP);
+
+    // 加载API配置
+    const savedConfig = getAPIConfig();
+    setApiProvider(savedConfig.provider);
+    setApiKey(savedConfig.apiKey);
+    setApiModel(savedConfig.model);
 
     const welcomeMessage: Message = {
       id: Date.now().toString(),
@@ -465,12 +482,100 @@ export default function ChatPage() {
   );
 
   // 设置页面
-  const SettingsView = () => (
+  const SettingsView = () => {
+    const providers = getAllProviders();
+    const currentProviderConfig = getProviderConfig(apiProvider);
+
+    const handleSaveAPI = () => {
+      saveAPIConfig({ provider: apiProvider, apiKey, model: apiModel });
+      showToast('API配置已保存');
+    };
+
+    const handleTestAPI = async () => {
+      if (!apiKey) { setApiTestStatus('error'); setApiTestMsg('请先输入API Key'); return; }
+      setApiTestStatus('testing'); setApiTestMsg('测试中...');
+      try {
+        const baseUrl = currentProviderConfig.baseUrl;
+        const modelToUse = apiModel || currentProviderConfig.defaultModel;
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: modelToUse, messages: [{ role: 'user', content: '你好' }], max_tokens: 10 }),
+        });
+        if (res.ok) { setApiTestStatus('success'); setApiTestMsg('✅ 连接成功！'); }
+        else { const d = await res.json().catch(() => ({})); setApiTestStatus('error'); setApiTestMsg(`❌ ${d.error?.message || res.status}`); }
+      } catch (e) { setApiTestStatus('error'); setApiTestMsg(`❌ 网络错误`); }
+    };
+
+    return (
     <div className="flex-1 overflow-y-auto">
       <div className="flex items-center justify-center p-3 sm:p-4 border-b border-slate-700 bg-slate-800/50">
         <h1 className="text-base sm:text-lg font-semibold text-white">设置</h1>
       </div>
       <div className="p-4 space-y-4">
+
+        {/* AI接口配置 */}
+        <div className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden">
+          <button onClick={() => setShowApiKeyInput(!showApiKeyInput)} className="w-full flex items-center gap-4 px-4 py-4 hover:bg-slate-700 transition-colors">
+            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <Key className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="text-white font-medium">AI接口配置</p>
+              <p className="text-gray-400 text-sm">{apiKey ? '已配置 · ' + currentProviderConfig.name : '点击配置API Key'}</p>
+            </div>
+            {apiKey ? <span className="px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-green-400 text-xs">已配置</span> : <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showApiKeyInput ? 'rotate-180' : ''}`} />}
+          </button>
+
+          {showApiKeyInput && (
+            <div className="px-4 pb-4 space-y-3 border-t border-slate-700 pt-3">
+              {/* 平台选择 */}
+              <div className="relative">
+                <button onClick={() => setShowProviderDropdown(!showProviderDropdown)} className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-white text-sm">
+                  <span>{currentProviderConfig.name}</span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showProviderDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {showProviderDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 border border-slate-600 rounded-xl overflow-hidden z-20 shadow-xl">
+                    {providers.map(p => (
+                      <button key={p.id} onClick={() => { setApiProvider(p.id); setShowProviderDropdown(false); setApiModel(''); }} className={`w-full flex items-center justify-between px-3 py-2.5 hover:bg-slate-600 text-sm ${apiProvider === p.id ? 'text-blue-400' : 'text-white'}`}>
+                        <span>{p.name}</span>
+                        {apiProvider === p.id && <Check className="w-4 h-4" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* API Key */}
+              <div className="relative">
+                <input type={showApiKeyVisible ? 'text' : 'password'} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="输入API Key (sk-xxx...)" className="w-full px-3 py-2.5 pr-16 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 text-sm" />
+                <button onClick={() => setShowApiKeyVisible(!showApiKeyVisible)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-white">
+                  {showApiKeyVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* 模型选择 */}
+              {apiProvider !== 'custom' && currentProviderConfig.models.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {currentProviderConfig.models.map(m => (
+                    <button key={m} onClick={() => setApiModel(m)} className={`px-2.5 py-1 rounded-lg text-xs ${apiModel === m ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300 border border-slate-600'}`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* 保存/测试 */}
+              <div className="flex gap-2">
+                <button onClick={handleSaveAPI} className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium rounded-xl">保存</button>
+                <button onClick={handleTestAPI} disabled={apiTestStatus === 'testing'} className="flex-1 py-2.5 bg-slate-700 border border-slate-600 text-white text-sm font-medium rounded-xl disabled:opacity-50">{apiTestStatus === 'testing' ? '测试中...' : '测试'}</button>
+              </div>
+              {apiTestMsg && <p className={`text-xs p-2 rounded-lg ${apiTestStatus === 'success' ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'}`}>{apiTestMsg}</p>}
+            </div>
+          )}
+        </div>
+
         {/* 主题切换 */}
         <div className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden">
           <div className="flex items-center gap-4 px-4 py-4">
@@ -487,13 +592,7 @@ export default function ChatPage() {
 
         {/* 清除缓存 */}
         <div className="bg-slate-800 rounded-2xl border border-slate-600 overflow-hidden">
-          <button
-            onClick={() => {
-              handleClear();
-              showToast('缓存已清除');
-            }}
-            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-slate-700 transition-colors"
-          >
+          <button onClick={() => { handleClear(); showToast('缓存已清除'); }} className="w-full flex items-center gap-4 px-4 py-4 hover:bg-slate-700 transition-colors">
             <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
               <Trash2 className="w-5 h-5 text-red-400" />
             </div>
@@ -512,9 +611,9 @@ export default function ChatPage() {
             </div>
             <div className="flex-1 text-left">
               <p className="text-white font-medium">关于我们</p>
-              <p className="text-gray-400 text-sm">AI智能助手 v2.0.0</p>
+              <p className="text-gray-400 text-sm">AI智能助手 v2.1.0</p>
             </div>
-            <span className="text-gray-500 text-xs">v2.0.0</span>
+            <span className="text-gray-500 text-xs">v2.1.0</span>
           </div>
         </div>
 
@@ -528,13 +627,7 @@ export default function ChatPage() {
               <p className="text-white font-medium">VIP信息</p>
               <p className="text-gray-400 text-sm">{isVIP ? 'VIP会员 · 已激活' : '普通用户 · 未开通'}</p>
             </div>
-            {isVIP ? (
-              <span className="text-yellow-400 text-sm font-medium">已开通</span>
-            ) : (
-              <button onClick={() => router.push('/settings')} className="px-3 py-1 bg-gradient-to-r from-yellow-600 to-orange-600 text-white text-sm rounded-lg">
-                升级
-              </button>
-            )}
+            {isVIP ? <span className="text-yellow-400 text-sm font-medium">已开通</span> : <button onClick={() => router.push('/settings')} className="px-3 py-1 bg-gradient-to-r from-yellow-600 to-orange-600 text-white text-sm rounded-lg">升级</button>}
           </div>
         </div>
 
@@ -545,7 +638,8 @@ export default function ChatPage() {
         </button>
       </div>
     </div>
-  );
+    );
+  };
 
   // 渲染当前Tab内容
   const renderContent = () => {
