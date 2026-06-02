@@ -6,6 +6,7 @@ import { Send, User, Bot, Crown, Menu, X, Trash2, LogOut, Heart, Flame, Cloud, S
 import { checkAuth, localLogout } from '@/lib/localAuth';
 import { roleConfigs, generateAIResponse } from '@/lib/aiResponses';
 import type { RoleMode } from '@/lib/aiResponses';
+import { callAI, getAPIConfig } from '@/lib/aiApi';
 import RainBackground from '@/components/RainBackground';
 
 type BottomTab = 'chat' | 'features' | 'profile' | 'settings';
@@ -108,23 +109,61 @@ export default function ChatPage() {
     setIsLoading(true);
     inputRef.current?.blur();
 
-    setTimeout(() => {
-      const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }));
-      const aiResponse = generateAIResponse(userMessage.content, currentRole, isVIP, history);
+    // 检查是否配置了API Key
+    const apiConfig = getAPIConfig();
+    const hasApiKey = !!apiConfig.apiKey;
 
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: aiResponse,
-        timestamp: new Date(),
-      };
+    if (hasApiKey && isVIP) {
+      // 使用真实AI API
+      try {
+        const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }));
+        const aiContent = await callAI(userMessage.content, currentRole, history);
 
-      setMessages(prev => {
-        messagesRef.current = [...prev, aiMessage];
-        return messagesRef.current;
-      });
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: aiContent,
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => {
+          messagesRef.current = [...prev, aiMessage];
+          return messagesRef.current;
+        });
+      } catch (error: unknown) {
+        const errorMsg = error instanceof Error ? error.message : 'AI回复失败';
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `⚠️ ${errorMsg}\n\n请检查设置中的API配置。`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => {
+          messagesRef.current = [...prev, errorMessage];
+          return messagesRef.current;
+        });
+      }
       setIsLoading(false);
-    }, 800 + Math.random() * 1200);
+    } else {
+      // 回退到本地预设回复
+      setTimeout(() => {
+        const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }));
+        const aiResponse = generateAIResponse(userMessage.content, currentRole, isVIP, history);
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: aiResponse,
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => {
+          messagesRef.current = [...prev, aiMessage];
+          return messagesRef.current;
+        });
+        setIsLoading(false);
+      }, 800 + Math.random() * 1200);
+    }
   };
 
   const handleClear = () => {
